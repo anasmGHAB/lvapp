@@ -2,6 +2,8 @@ import "./globals.css";
 import Sidebar from "./components/Sidebar";
 import { Suspense } from "react";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Nexus Analytics",
   description: "Premium web analytics dashboard",
@@ -24,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="fixed inset-0 z-[-1] pointer-events-none">
             <div className="absolute top-0 left-0 w-full h-full bg-[url('/grid.svg')] opacity-[0.03]"></div>
           </div>
-          {children}
+          <Suspense fallback={null}>
+            {children}
+          </Suspense>
         </main>
       </body>
     </html>
