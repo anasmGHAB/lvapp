@@ -1,5 +1,6 @@
 import "./globals.css";
 import Sidebar from "./components/Sidebar";
+import { Suspense } from "react";
 
 export const metadata = {
   title: "Nexus Analytics",
@@ -15,7 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="flex min-h-screen bg-slate-950 text-white font-sans antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
-        <Sidebar />
+        <Suspense fallback={null}>
+          <Sidebar />
+        </Suspense>
         <main className="flex-1 min-h-screen relative z-0">
           {/* Background Gradients for depth */}
           <div className="fixed inset-0 z-[-1] pointer-events-none">
