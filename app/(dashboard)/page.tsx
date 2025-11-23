@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { useSearchParams } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
+import { useTheme } from "../components/ThemeProvider";
 import {
   PieChart,
   Pie,
@@ -63,6 +65,10 @@ export default function Page() {
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const searchParams = useSearchParams();
   const currentView = searchParams.get("view") || "analytics";
+  const { user } = useUser();
+
+  // Check if user is admin
+  const isAdmin = user?.emailAddresses?.[0]?.emailAddress === "anasmghabar@gmail.com";
 
   useEffect(() => {
     loadExcel().then((sheetData) => {
@@ -127,12 +133,14 @@ export default function Page() {
   // 4. Actions (Edit, Add, Delete, Save, Export)
   // ---------------------------------------------
   const handleCellChange = (rowIndex: number, header: string, value: string) => {
+    if (!isAdmin) return; // Only admin can edit
     const newData = [...data];
     newData[rowIndex] = { ...newData[rowIndex], [header]: value };
     setData(newData);
   };
 
   const handleAddRow = () => {
+    if (!isAdmin) return; // Only admin can add
     if (tableHeaders.length === 0) return;
     const newRow: ExcelRow = {};
     tableHeaders.forEach(h => newRow[h] = "");
@@ -140,11 +148,13 @@ export default function Page() {
   };
 
   const handleDeleteRow = (index: number) => {
+    if (!isAdmin) return; // Only admin can delete
     const newData = data.filter((_, i) => i !== index);
     setData(newData);
   };
 
   const handleSaveChanges = async () => {
+    if (!isAdmin) return; // Only admin can save
     setIsSaving(true);
     try {
       const response = await fetch('/api/tagging-plan', {
@@ -342,32 +352,36 @@ export default function Page() {
                 />
               </div>
 
-              <button
-                onClick={handleSaveChanges}
-                disabled={isSaving}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition shadow-lg font-medium whitespace-nowrap ${saveStatus === "success"
-                    ? "bg-emerald-600 text-white"
-                    : saveStatus === "error"
-                      ? "bg-rose-600 text-white"
-                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20"
-                  }`}
-              >
-                {isSaving ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                ) : saveStatus === "success" ? (
-                  <CheckCircleIcon className="w-5 h-5" />
-                ) : (
-                  <ArrowDownTrayIcon className="w-5 h-5" />
-                )}
-                {saveStatus === "success" ? "Saved!" : "Save Changes"}
-              </button>
+              {isAdmin && (
+                <>
+                  <button
+                    onClick={handleSaveChanges}
+                    disabled={isSaving}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition shadow-lg font-medium whitespace-nowrap ${saveStatus === "success"
+                      ? "bg-emerald-600 text-white"
+                      : saveStatus === "error"
+                        ? "bg-rose-600 text-white"
+                        : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20"
+                      }`}
+                  >
+                    {isSaving ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : saveStatus === "success" ? (
+                      <CheckCircleIcon className="w-5 h-5" />
+                    ) : (
+                      <ArrowDownTrayIcon className="w-5 h-5" />
+                    )}
+                    {saveStatus === "success" ? "Saved!" : "Save Changes"}
+                  </button>
 
-              <button
-                onClick={handleAddRow}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition shadow-lg shadow-slate-700/20 font-medium whitespace-nowrap"
-              >
-                <PlusIcon className="w-5 h-5" /> Add Row
-              </button>
+                  <button
+                    onClick={handleAddRow}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition shadow-lg shadow-slate-700/20 font-medium whitespace-nowrap"
+                  >
+                    <PlusIcon className="w-5 h-5" /> Add Row
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -395,18 +409,21 @@ export default function Page() {
                             type="text"
                             value={row[header] || ""}
                             onChange={(e) => handleCellChange(idx, header, e.target.value)}
-                            className="bg-transparent border-none focus:ring-0 w-full text-slate-300 focus:text-white p-0"
+                            readOnly={!isAdmin}
+                            className={`bg-transparent border-none focus:ring-0 w-full text-slate-300 focus:text-white p-0 ${!isAdmin ? 'cursor-default' : ''}`}
                           />
                         </td>
                       ))}
                       <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => handleDeleteRow(idx)}
-                          className="text-slate-500 hover:text-rose-500 transition p-1 rounded-lg hover:bg-rose-500/10"
-                          title="Delete Row"
-                        >
-                          <TrashIcon className="w-5 h-5" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteRow(idx)}
+                            className="text-slate-500 hover:text-rose-500 transition p-1 rounded-lg hover:bg-rose-500/10"
+                            title="Delete Row"
+                          >
+                            <TrashIcon className="w-5 h-5" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -431,81 +448,87 @@ export default function Page() {
 
       {/* VIEW: SETTINGS */}
       {currentView === "settings" && (
-        <div className="max-w-4xl mx-auto animate-fade-in">
-          <h2 className="text-3xl font-bold text-white mb-8">Settings</h2>
+        <SettingsView />
+      )}
 
-          <div className="grid gap-6">
-            {/* Profile Section */}
-            <div className="glass-card p-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400">
-                  <UserCircleIcon className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Profile Settings</h3>
-                  <p className="text-slate-400 text-sm">Manage your account information</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
-                  <input type="text" defaultValue="Anas M" className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
-                  <input type="email" defaultValue="admin@lvapp.com" className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" />
-                </div>
-              </div>
+    </div>
+  );
+}
+
+// Settings View Component
+function SettingsView() {
+  const { user } = useUser();
+  const { theme, toggleTheme } = useTheme();
+
+  return (
+    <div className="max-w-4xl mx-auto animate-fade-in">
+      <h2 className="text-3xl font-bold text-white mb-8">Settings</h2>
+
+      <div className="grid gap-6">
+        {/* Profile Section */}
+        <div className="glass-card p-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400">
+              <UserCircleIcon className="w-8 h-8" />
             </div>
-
-            {/* Appearance Section */}
-            <div className="glass-card p-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
-                  <SwatchIcon className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Appearance</h3>
-                  <p className="text-slate-400 text-sm">Customize the look and feel</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
-                <div>
-                  <p className="text-white font-medium">Dark Mode</p>
-                  <p className="text-slate-400 text-xs">Always active for premium feel</p>
-                </div>
-                <div className="w-12 h-6 bg-indigo-600 rounded-full relative cursor-pointer">
-                  <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow-sm"></div>
-                </div>
-              </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Profile Settings</h3>
+              <p className="text-slate-400 text-sm">Manage your account information</p>
             </div>
-
-            {/* Notifications Section */}
-            <div className="glass-card p-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-400">
-                  <BellIcon className="w-8 h-8" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">Notifications</h3>
-                  <p className="text-slate-400 text-sm">Manage your alert preferences</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-slate-300">Email Reports</p>
-                  <input type="checkbox" defaultChecked className="w-5 h-5 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500" />
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-slate-300">System Updates</p>
-                  <input type="checkbox" defaultChecked className="w-5 h-5 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500" />
-                </div>
-              </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Full Name</label>
+              <input
+                type="text"
+                value={user?.fullName || user?.firstName || ""}
+                readOnly
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-2">Email Address</label>
+              <input
+                type="email"
+                value={user?.emailAddresses?.[0]?.emailAddress || ""}
+                readOnly
+                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition"
+              />
             </div>
           </div>
         </div>
-      )}
 
+        {/* Appearance Section */}
+        <div className="glass-card p-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
+              <SwatchIcon className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Appearance</h3>
+              <p className="text-slate-400 text-sm">Customize the look and feel</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-slate-700/50">
+            <div>
+              <p className="text-white font-medium">Dark Mode</p>
+              <p className="text-slate-400 text-xs">
+                {theme === "dark" ? "Currently in dark mode" : "Currently in light mode"}
+              </p>
+            </div>
+            <button
+              onClick={toggleTheme}
+              className={`w-12 h-6 rounded-full relative transition-colors duration-200 ${theme === "dark" ? 'bg-indigo-600' : 'bg-slate-600'
+                }`}
+            >
+              <div
+                className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${theme === "dark" ? 'right-1' : 'left-1'
+                  }`}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
