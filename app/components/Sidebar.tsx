@@ -3,7 +3,9 @@ import { HomeIcon, ChartBarIcon, Cog8ToothIcon, DocumentTextIcon } from "@heroic
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-export default function Sidebar() {
+import { Suspense } from "react";
+
+function SidebarContent() {
   const searchParams = useSearchParams();
   const currentView = searchParams.get("view") || "analytics";
 
@@ -61,13 +63,21 @@ export default function Sidebar() {
   );
 }
 
+export default function Sidebar() {
+  return (
+    <Suspense fallback={<div className="w-72 h-screen fixed left-0 top-0 border-r border-white/10 bg-slate-900/50 backdrop-blur-xl z-50" />}>
+      <SidebarContent />
+    </Suspense>
+  );
+}
+
 function NavItem({ icon, label, active = false, href }: { icon: React.ReactNode; label: string; active?: boolean; href: string }) {
   return (
     <Link
       href={href}
       className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${active
-          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
-          : "text-slate-400 hover:text-white hover:bg-white/5"
+        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20"
+        : "text-slate-400 hover:text-white hover:bg-white/5"
         }`}
     >
       <span className={`${active ? "text-white" : "text-slate-400 group-hover:text-white"}`}>{icon}</span>
