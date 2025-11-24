@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import * as XLSX from "xlsx";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
@@ -29,7 +29,9 @@ import {
   BellIcon,
   SwatchIcon,
   TrashIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  PhotoIcon,
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 
 // ---------------------------------------------
@@ -63,6 +65,9 @@ export default function Page() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
+  const [photos, setPhotos] = useState<Record<number, string>>({});
+  const [popupImage, setPopupImage] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const searchParams = useSearchParams();
   const currentView = searchParams.get("view") || "analytics";
   const { user } = useUser();
@@ -75,6 +80,13 @@ export default function Page() {
       setData(sheetData);
       setLoading(false);
     });
+    // Load photos from server
+    fetch('/api/tagging-plan/photos')
+      .then(res => res.json())
+      .then(loadedPhotos => {
+        setPhotos(loadedPhotos);
+      })
+      .catch(err => console.error('Failed to load photos:', err));
   }, []);
 
   // Reset save status after 3 seconds
@@ -127,7 +139,7 @@ export default function Page() {
     );
   }, [data, searchTerm]);
 
-  const tableHeaders = data.length > 0 ? Object.keys(data[0]) : [];
+  const tableHeaders = data.length > 0 ? Object.keys(data[0]).filter(h => h !== 'PHOTO') : [];
 
   // ---------------------------------------------
   // 4. Actions (Edit, Add, Delete, Save, Export)
@@ -151,12 +163,32 @@ export default function Page() {
     if (!isAdmin) return; // Only admin can delete
     const newData = data.filter((_, i) => i !== index);
     setData(newData);
+    // Remove photo from state and save to server
+    setPhotos(prev => {
+      const newPhotos = { ...prev };
+      delete newPhotos[index];
+      // Save to server
+      fetch('/api/tagging-plan/photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPhotos)
+      }).catch(err => console.error('Failed to save photos:', err));
+      return newPhotos;
+    });
   };
 
   const handleSaveChanges = async () => {
     if (!isAdmin) return; // Only admin can save
     setIsSaving(true);
     try {
+      // Save photos to server
+      await fetch('/api/tagging-plan/photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(photos)
+      });
+
+      // Save data to Excel
       const response = await fetch('/api/tagging-plan', {
         method: 'POST',
         headers: {
@@ -175,6 +207,31 @@ export default function Page() {
       setSaveStatus("error");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePhotoUpload = (rowIndex: number, file: File) => {
+    if (!isAdmin) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const photoData = reader.result as string;
+      setPhotos(prev => {
+        const newPhotos = { ...prev, [rowIndex]: photoData };
+        // Save to server immediately
+        fetch('/api/tagging-plan/photos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newPhotos)
+        }).catch(err => console.error('Failed to save photos:', err));
+        return newPhotos;
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoClick = (rowIndex: number) => {
+    if (photos[rowIndex]) {
+      setPopupImage(photos[rowIndex]);
     }
   };
 
@@ -397,6 +454,7 @@ export default function Page() {
                     {tableHeaders.map((header) => (
                       <th key={header} className="px-6 py-4 font-medium">{header}</th>
                     ))}
+                    <th className="px-6 py-4 font-medium w-32">PHOTO</th>
                     <th className="px-6 py-4 font-medium w-10"></th>
                   </tr>
                 </thead>
@@ -414,6 +472,70 @@ export default function Page() {
                           />
                         </td>
                       ))}
+                      <td className="px-6 py-4 text-center relative">
+                        {isAdmin && (
+                          <>
+                            <input
+                              ref={el => { fileInputRefs.current[idx] = el; }}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handlePhotoUpload(idx, file);
+                              }}
+                            />
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => {
+                                  if (photos[idx]) {
+                                    handlePhotoClick(idx);
+                                  } else {
+                                    fileInputRefs.current[idx]?.click();
+                                  }
+                                }}
+                                className={`p-2 rounded-lg transition ${photos[idx]
+                                  ? 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30'
+                                  : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
+                                  }`}
+                                title={photos[idx] ? "View photo" : "Upload photo"}
+                              >
+                                <PhotoIcon className="w-5 h-5" />
+                              </button>
+                              {photos[idx] && (
+                                <button
+                                  onClick={() => {
+                                    setPhotos(prev => {
+                                      const newPhotos = { ...prev };
+                                      delete newPhotos[idx];
+                                      // Save to server immediately
+                                      fetch('/api/tagging-plan/photos', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify(newPhotos)
+                                      }).catch(err => console.error('Failed to save photos:', err));
+                                      return newPhotos;
+                                    });
+                                    // Reset file input to allow re-upload
+                                    if (fileInputRefs.current[idx]) {
+                                      fileInputRefs.current[idx]!.value = '';
+                                    }
+                                  }}
+                                  className="p-2 rounded-lg transition bg-rose-500/20 text-rose-400 hover:bg-rose-500/30"
+                                  title="Delete photo"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                        {!isAdmin && photos[idx] && (
+                          <div className="flex items-center justify-center">
+                            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-right">
                         {isAdmin && (
                           <button
@@ -442,6 +564,29 @@ export default function Page() {
                 Showing top 50 results of {filteredData.length}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Photo Popup Modal */}
+      {popupImage && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPopupImage(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] p-4">
+            <button
+              onClick={() => setPopupImage(null)}
+              className="absolute -top-2 -right-2 p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-full shadow-lg transition z-10"
+            >
+              <XMarkIcon className="w-6 h-6" />
+            </button>
+            <img
+              src={popupImage}
+              alt="Full size"
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

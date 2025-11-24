@@ -13,6 +13,14 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const [theme, setTheme] = useState<Theme>("dark");
 
+    // Load theme from localStorage on mount
+    useEffect(() => {
+        const savedTheme = localStorage.getItem("theme") as Theme | null;
+        if (savedTheme) {
+            setTheme(savedTheme);
+        }
+    }, []);
+
     useEffect(() => {
         // Apply theme to document
         if (theme === "light") {
@@ -22,10 +30,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             document.documentElement.classList.add("dark-mode");
             document.documentElement.classList.remove("light-mode");
         }
+        // Save to localStorage
+        localStorage.setItem("theme", theme);
     }, [theme]);
 
     const toggleTheme = () => {
-        setTheme(prev => prev === "dark" ? "light" : "dark");
+        setTheme(prev => {
+            const newTheme = prev === "dark" ? "light" : "dark";
+            localStorage.setItem("theme", newTheme);
+            return newTheme;
+        });
     };
 
     return (
