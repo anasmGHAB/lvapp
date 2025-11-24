@@ -473,6 +473,7 @@ export default function Page() {
                         </td>
                       ))}
                       <td className="px-6 py-4 text-center relative">
+                        {/* Admin Controls */}
                         {isAdmin && (
                           <>
                             <input
@@ -530,9 +531,17 @@ export default function Page() {
                             </div>
                           </>
                         )}
+
+                        {/* Non-Admin View */}
                         {!isAdmin && photos[idx] && (
                           <div className="flex items-center justify-center">
-                            <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                            <button
+                              onClick={() => handlePhotoClick(idx)}
+                              className="p-2 rounded-lg transition bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30"
+                              title="View photo"
+                            >
+                              <PhotoIcon className="w-5 h-5" />
+                            </button>
                           </div>
                         )}
                       </td>

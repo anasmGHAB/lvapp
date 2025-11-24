@@ -18,9 +18,18 @@ export async function GET() {
     }
 }
 
+import { currentUser } from '@clerk/nextjs/server';
+
 // POST - Save photos
 export async function POST(request: Request) {
     try {
+        const user = await currentUser();
+        const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+
+        if (userEmail !== "anasmghabar@gmail.com") {
+            return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 });
+        }
+
         const photos = await request.json();
 
         // Ensure directory exists
