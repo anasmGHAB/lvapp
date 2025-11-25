@@ -1,5 +1,5 @@
 "use client";
-import { HomeIcon, ChartBarIcon, Cog8ToothIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import { HomeIcon, ChartBarIcon, Cog8ToothIcon, DocumentTextIcon, TableCellsIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
@@ -37,8 +37,8 @@ function SidebarContent() {
       {/* Logo Area */}
       <div className="p-8 flex items-center gap-3">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${theme === 'light'
-            ? 'bg-white text-[#5D4E37] shadow-[#5D4E37]/20'
-            : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-500/20'
+          ? 'bg-white text-[#5D4E37] shadow-[#5D4E37]/20'
+          : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-indigo-500/20'
           }`}>
           <span className="font-bold text-xl">LV</span>
         </div>
@@ -61,6 +61,12 @@ function SidebarContent() {
           icon={<DocumentTextIcon className="w-5 h-5" />}
           label="Tagging Plan"
           active={currentView === "tagging-plan"}
+        />
+        <NavItem
+          href="/?view=data-ref"
+          icon={<TableCellsIcon className="w-5 h-5" />}
+          label="Data referantial"
+          active={currentView === "data-ref"}
         />
 
         <div className="my-4 h-px bg-white/5 mx-4" />

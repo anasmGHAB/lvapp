@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
 
-const PHOTOS_FILE = path.join(process.cwd(), 'public', 'data', 'tagging-plan-photos.json');
+const getPhotosPath = (sheet: string) => {
+    const filename = sheet === 'Data ref' ? 'data-ref-photos.json' : 'tagging-plan-photos.json';
+    return path.join(process.cwd(), 'public', 'data', filename);
+};
 
-// GET - Load photos
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const sheet = searchParams.get('sheet') || 'Tagging Plan';
+        const PHOTOS_FILE = getPhotosPath(sheet);
+
         if (fs.existsSync(PHOTOS_FILE)) {
             const data = fs.readFileSync(PHOTOS_FILE, 'utf-8');
             return NextResponse.json(JSON.parse(data));
@@ -18,19 +24,11 @@ export async function GET() {
     }
 }
 
-import { currentUser } from '@clerk/nextjs/server';
-
-// POST - Save photos
 export async function POST(request: Request) {
     try {
-        const user = await currentUser();
-        const userEmail = user?.emailAddresses?.[0]?.emailAddress;
-
-        if (userEmail !== "anasmghabar@gmail.com") {
-            return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 });
-        }
-
-        const photos = await request.json();
+        const body = await request.json();
+        const sheet = body.sheet || 'Tagging Plan';
+        const PHOTOS_FILE = getPhotosPath(sheet);
 
         // Ensure directory exists
         const dir = path.dirname(PHOTOS_FILE);
@@ -39,7 +37,8 @@ export async function POST(request: Request) {
         }
 
         // Save photos to JSON file
-        fs.writeFileSync(PHOTOS_FILE, JSON.stringify(photos, null, 2));
+        const dataToSave = body.photos ? body.photos : body;
+        fs.writeFileSync(PHOTOS_FILE, JSON.stringify(dataToSave, null, 2));
 
         return NextResponse.json({ success: true, message: 'Photos saved successfully' });
     } catch (error) {
