@@ -1,5 +1,5 @@
 "use client";
-import { HomeIcon, ChartBarIcon, Cog8ToothIcon, DocumentTextIcon, TableCellsIcon } from "@heroicons/react/24/outline";
+import { HomeIcon, ChartBarIcon, Cog8ToothIcon, DocumentTextIcon, TableCellsIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
@@ -69,6 +69,13 @@ function SidebarContent() {
           active={currentView === "data-ref"}
         />
 
+        <NavItem
+          href="/?view=ai-assistant"
+          icon={<SparklesIcon className="w-5 h-5" />}
+          label="AI Assistant"
+          active={currentView === "ai-assistant"}
+        />
+
         <div className="my-4 h-px bg-white/5 mx-4" />
 
         <NavItem
@@ -82,12 +89,12 @@ function SidebarContent() {
       {/* User Profile */}
       <div className="p-6 border-t border-white/5">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer border border-white/5">
-          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold text-xs border border-indigo-500/30 flex-shrink-0">
+          <div suppressHydrationWarning className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-300 font-bold text-xs border border-indigo-500/30 flex-shrink-0">
             {getInitials()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">{displayName}</p>
-            <p className="text-xs text-slate-400 truncate">{user?.emailAddresses?.[0]?.emailAddress || ""}</p>
+            <p suppressHydrationWarning className="text-sm font-medium text-white truncate">{displayName}</p>
+            <p suppressHydrationWarning className="text-xs text-slate-400 truncate">{user?.emailAddresses?.[0]?.emailAddress || ""}</p>
           </div>
         </div>
       </div>

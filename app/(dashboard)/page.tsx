@@ -41,6 +41,7 @@ import {
   ChevronRightIcon
 } from "@heroicons/react/24/outline";
 import React from "react";
+import AIAssistant from "../components/AIAssistant";
 
 // ---------------------------------------------
 // Types
@@ -357,6 +358,8 @@ export default function Page() {
   const isTableView = currentView === "tagging-plan" || currentView === "data-ref";
   const viewTitle = currentView === "data-ref" ? "Data Referential" : "Tagging Plan";
   const isNewTaggingPlan = currentView === "tagging-plan";
+
+
 
   const { user } = useUser();
 
@@ -1319,6 +1322,13 @@ export default function Page() {
               className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
             />
           </div>
+        </div>
+      )}
+
+      {/* VIEW: AI ASSISTANT */}
+      {currentView === "ai-assistant" && (
+        <div className="h-[calc(100vh-100px)]">
+          <AIAssistant />
         </div>
       )}
 
