@@ -73,7 +73,7 @@ async function getContextData() {
 
 export async function POST(request: Request) {
     try {
-        const { message, history } = await request.json();
+        const { message, history, images } = await request.json();
 
         if (!process.env.GOOGLE_API_KEY) {
             return NextResponse.json({ error: "Google API Key not configured" }, { status: 500 });
@@ -105,7 +105,25 @@ export async function POST(request: Request) {
             },
         });
 
-        const result = await chat.sendMessage(message);
+        // Prepare message parts (text + images if provided)
+        const messageParts: any[] = [];
+
+        if (message && message.trim()) {
+            messageParts.push({ text: message });
+        }
+
+        if (images && images.length > 0) {
+            for (const img of images) {
+                messageParts.push({
+                    inlineData: {
+                        mimeType: img.mimeType,
+                        data: img.data
+                    }
+                });
+            }
+        }
+
+        const result = await chat.sendMessage(messageParts);
         const response = result.response.text();
 
         return NextResponse.json({ response });
