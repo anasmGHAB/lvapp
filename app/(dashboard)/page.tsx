@@ -200,24 +200,37 @@ interface RowItemProps {
   handleCellChange: (rowId: string, header: string, value: string) => void;
   handlePhotoUpload: (rowId: string, file: File) => void;
   handleDeletePhoto: (rowId: string) => void;
+  handleDeleteRow: (rowId: string) => void;
   setPopupImage: (src: string | null) => void;
   fileInputRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
   columnWidths: Record<string, number>;
   showPhoto: boolean;
 }
 
-function RowItem({ row, headers, isAdmin, photos, handleCellChange, handlePhotoUpload, handleDeletePhoto, setPopupImage, fileInputRefs, columnWidths, showPhoto }: RowItemProps) {
+function RowItem({ row, headers, isAdmin, photos, handleCellChange, handlePhotoUpload, handleDeletePhoto, handleDeleteRow, setPopupImage, fileInputRefs, columnWidths, showPhoto }: RowItemProps) {
   return (
-    <tr key={row._id} className="hover:bg-slate-800/50 transition-colors border-b border-slate-800/50">
-      {headers.map(header => {
+    <tr key={row._id} className="group hover:bg-slate-800/50 transition-colors border-b border-slate-800/50">
+      <td className="px-4 py-3 text-center align-top w-16">
+        {isAdmin && (
+          <button
+            onClick={() => handleDeleteRow(row._id as string)}
+            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition p-1 hover:bg-red-500/10 rounded"
+            title="Delete Row"
+          >
+            <TrashIcon className="w-5 h-5" />
+          </button>
+        )}
+      </td>
+      {headers.map((header, headerIdx) => {
         // Special rendering for PHOTO column
         if (header === 'PHOTO') {
           if (!showPhoto) return null;
           return (
-            <td key={header} className="px-4 py-3 text-center align-top w-24">
+            <td key={`photo-${headerIdx}`} className="px-4 py-3 text-center align-top w-24">
               <div className="flex items-center justify-center gap-2">
                 {photos[row._id as string] ? (
                   <>
+
                     <button
                       onClick={() => setPopupImage(photos[row._id as string])}
                       className="text-indigo-400 hover:text-indigo-300 transition"
@@ -267,7 +280,7 @@ function RowItem({ row, headers, isAdmin, photos, handleCellChange, handlePhotoU
         // Normal column rendering
         return (
           <td
-            key={header}
+            key={`${header}-${headerIdx}`}
             className="px-4 py-3 text-sm text-slate-300 align-top"
             style={{
               width: columnWidths[header] || 'auto',
@@ -344,8 +357,8 @@ export default function Page() {
   const [showAll, setShowAll] = useState(false);
 
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const dragItem = useRef<number | null>(null);
-  const dragOverItem = useRef<number | null>(null);
+  const dragItem = useRef<string | null>(null);
+  const dragOverItem = useRef<string | null>(null);
   const resizingColumn = useRef<string | null>(null);
   const startX = useRef<number>(0);
   const startWidth = useRef<number>(0);
@@ -582,16 +595,39 @@ export default function Page() {
     if (tableHeaders.length === 0) return;
     const newRow: ExcelRow = { _id: crypto.randomUUID() };
     tableHeaders.forEach(h => newRow[h] = "");
+
+    // Update both data and groups
     setData([newRow, ...data]);
+
+    // Update groups if we have them
+    if (groups.length > 0) {
+      const newGroups = [...groups];
+      if (newGroups[0]) {
+        newGroups[0] = {
+          ...newGroups[0],
+          rows: [newRow, ...newGroups[0].rows]
+        };
+        // Automatically expand the group where the row was added so the user sees it
+        setExpandedCategories(prev => new Set(prev).add(newGroups[0].category));
+      }
+      setGroups(newGroups);
+    }
   };
 
   const handleAddColumn = () => {
     if (!isAdmin) return;
+
+    // Get all existing column names from tableHeaders, originalHeaders AND columnOrder
+    // This ensures we don't generate a name that exists but is currently hidden
+    const allExistingHeaders = [...new Set([...tableHeaders, ...originalHeaders, ...columnOrder])];
+
     // Direct Add: Generate a unique name
     let baseName = "New Column";
     let newName = baseName;
     let counter = 1;
-    while (tableHeaders.includes(newName)) {
+
+    // Keep incrementing until we find a unique name
+    while (allExistingHeaders.includes(newName)) {
       newName = `${baseName} ${counter}`;
       counter++;
     }
@@ -603,8 +639,23 @@ export default function Page() {
     }));
     setData(newData);
 
-    // Update column order
-    setColumnOrder([...columnOrder, newName]);
+    // Update groups
+    const newGroups = groups.map(g => ({
+      ...g,
+      rows: g.rows.map(row => ({
+        ...row,
+        [newName]: ""
+      }))
+    }));
+    setGroups(newGroups);
+
+    // Update originalHeaders to include the new column
+    setOriginalHeaders([...originalHeaders, newName]);
+
+    // Update column order - Only add if not already present (double safety)
+    if (!columnOrder.includes(newName)) {
+      setColumnOrder([...columnOrder, newName]);
+    }
   };
 
   const handleDeleteColumn = (columnName: string) => {
@@ -658,29 +709,33 @@ export default function Page() {
   };
 
   // Drag and Drop Handlers
-  const handleDragStart = (e: React.DragEvent<HTMLTableHeaderCellElement>, position: number) => {
+  const handleDragStart = (e: React.DragEvent<HTMLTableHeaderCellElement>, header: string) => {
     if (!isAdmin) return;
-    dragItem.current = position;
+    dragItem.current = header;
     // e.dataTransfer.effectAllowed = "move"; // Optional visual
   };
 
-  const handleDragEnter = (e: React.DragEvent<HTMLTableHeaderCellElement>, position: number) => {
+  const handleDragEnter = (e: React.DragEvent<HTMLTableHeaderCellElement>, header: string) => {
     if (!isAdmin) return;
-    dragOverItem.current = position;
+    dragOverItem.current = header;
     e.preventDefault();
   };
 
   const handleDragEnd = () => {
     if (!isAdmin) return;
-    const dragIndex = dragItem.current;
-    const dragOverIndex = dragOverItem.current;
+    const draggedHeader = dragItem.current;
+    const draggedOverHeader = dragOverItem.current;
 
-    if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
+    if (draggedHeader && draggedOverHeader && draggedHeader !== draggedOverHeader) {
       const newOrder = [...columnOrder];
-      const draggedItemContent = newOrder[dragIndex];
-      newOrder.splice(dragIndex, 1);
-      newOrder.splice(dragOverIndex, 0, draggedItemContent);
-      setColumnOrder(newOrder);
+      const dragIndex = newOrder.indexOf(draggedHeader);
+      const dragOverIndex = newOrder.indexOf(draggedOverHeader);
+
+      if (dragIndex !== -1 && dragOverIndex !== -1) {
+        newOrder.splice(dragIndex, 1);
+        newOrder.splice(dragOverIndex, 0, draggedHeader);
+        setColumnOrder(newOrder);
+      }
     }
 
     dragItem.current = null;
@@ -1082,26 +1137,21 @@ export default function Page() {
       {/* VIEW: TAGGING PLAN OR DATA REF */}
       {isTableView && (
         <div className="glass-card p-8 animate-fade-in">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <div>
-              <h3 className="text-2xl font-bold text-white">{viewTitle}</h3>
-              <p className="text-slate-400 text-sm mt-1">Detailed view of all tracking events</p>
+          <div className="flex flex-col md:flex-row justify-start items-center mb-8 gap-4">
+            <div className="relative w-full md:w-96">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <MagnifyingGlassIcon className="h-5 w-5 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search tags, pages, events..."
+                className="block w-full pl-10 pr-3 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
 
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <div className="relative w-full md:w-96">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <MagnifyingGlassIcon className="h-5 w-5 text-slate-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search tags, pages, events..."
-                  className="block w-full pl-10 pr-3 py-2.5 bg-slate-800/50 border border-slate-700 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-
+            <div className="flex items-center gap-4 flex-wrap">
               {isNewTaggingPlan && (
                 <button
                   onClick={() => setShowAll(!showAll)}
@@ -1161,17 +1211,18 @@ export default function Page() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-700/50 text-slate-400 text-sm uppercase tracking-wider">
+                    <th className="px-4 py-4 font-medium w-16"></th>
                     {tableHeaders.map((header, index) => {
                       if (header === 'PHOTO') {
                         if (currentView !== "tagging-plan") return null;
                         return (
                           <th
-                            key={header}
+                            key={`header-photo-${index}`}
                             className={`px-4 py-4 font-medium group relative ${isAdmin ? 'cursor-move hover:bg-slate-800/50' : ''}`}
                             style={{ width: columnWidths[header] || 'auto', minWidth: '100px', maxWidth: '150px' }}
                             draggable={isAdmin}
-                            onDragStart={(e) => handleDragStart(e, index)}
-                            onDragEnter={(e) => handleDragEnter(e, index)}
+                            onDragStart={(e) => handleDragStart(e, header)}
+                            onDragEnter={(e) => handleDragEnter(e, header)}
                             onDragEnd={handleDragEnd}
                             onDragOver={(e) => e.preventDefault()}
                           >
@@ -1183,12 +1234,12 @@ export default function Page() {
                       const tooltip = getTooltipContent(header);
                       return (
                         <th
-                          key={header}
+                          key={`header-${header}-${index}`}
                           className={`px-4 py-4 font-medium group relative ${isAdmin ? 'cursor-move hover:bg-slate-800/50' : ''}`}
                           style={{ width: columnWidths[header] || 'auto', minWidth: '200px', maxWidth: '400px' }}
                           draggable={isAdmin}
-                          onDragStart={(e) => handleDragStart(e, index)}
-                          onDragEnter={(e) => handleDragEnter(e, index)}
+                          onDragStart={(e) => handleDragStart(e, header)}
+                          onDragEnter={(e) => handleDragEnter(e, header)}
                           onDragEnd={handleDragEnd}
                           onDragOver={(e) => e.preventDefault()}
                           onClick={() => handleHeaderClick(header)}
@@ -1237,7 +1288,6 @@ export default function Page() {
                         </th>
                       )
                     })}
-                    <th className="px-6 py-4 font-medium w-10"></th>
                   </tr>
                 </thead>
 
@@ -1253,6 +1303,7 @@ export default function Page() {
                         handleCellChange={handleCellChange}
                         handlePhotoUpload={handlePhotoUpload}
                         handleDeletePhoto={handleDeletePhoto}
+                        handleDeleteRow={handleDeleteRow}
                         setPopupImage={setPopupImage}
                         fileInputRefs={fileInputRefs}
                         columnWidths={columnWidths}
@@ -1263,7 +1314,7 @@ export default function Page() {
                     filteredGroups.map(group => (
                       <React.Fragment key={group.category}>
                         <tr className="bg-yellow-400/10 border-b border-slate-700/50 cursor-pointer hover:bg-yellow-400/20 transition" onClick={() => toggleCategory(group.category)}>
-                          <td colSpan={tableHeaders.length + 2} className="px-6 py-3 font-bold text-yellow-400">
+                          <td colSpan={tableHeaders.length + 1} className="px-6 py-3 font-bold text-yellow-400">
                             <div className="flex items-center gap-2">
                               {expandedCategories.has(group.category) ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
                               {group.category}
@@ -1281,6 +1332,7 @@ export default function Page() {
                             handleCellChange={handleCellChange}
                             handlePhotoUpload={handlePhotoUpload}
                             handleDeletePhoto={handleDeletePhoto}
+                            handleDeleteRow={handleDeleteRow}
                             setPopupImage={setPopupImage}
                             fileInputRefs={fileInputRefs}
                             columnWidths={columnWidths}

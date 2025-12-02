@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <link rel="preconnect" href="https://fonts.googleapis.com" />
                     <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
                     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+                    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/3094/3094851.png" />
                 </head>
                 <body className={`${inter.className} flex min-h-screen bg-slate-950 text-white font-sans antialiased selection:bg-indigo-500/30 selection:text-indigo-200`}>
                     {children}

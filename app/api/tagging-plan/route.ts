@@ -8,8 +8,16 @@ export async function POST(request: Request) {
         const { data, sheetName } = await request.json();
         const targetSheet = sheetName || "Tagging Plan";
 
+        // Determine the correct file based on the sheet name
+        let fileName = 'plan_tagging_fictif.xlsx';
+        if (targetSheet === "Data ref") {
+            fileName = 'data ref.xlsx';
+        } else if (targetSheet === "Tagging Plan") {
+            fileName = 'new tagging plan.xlsx';
+        }
+
         // Define path to the public folder where the file is located
-        const filePath = path.join(process.cwd(), 'public', 'data', 'plan_tagging_fictif.xlsx');
+        const filePath = path.join(process.cwd(), 'public', 'data', fileName);
 
         let workbook;
         if (fs.existsSync(filePath)) {

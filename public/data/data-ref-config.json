@@ -2,6 +2,10 @@
   "columns": [
     "Custom Dimension Name",
     "Situation",
-    "Commentary"
+    "Commentary",
+    "New Column",
+    "New Column",
+    "New Column",
+    "New Column"
   ]
 }
